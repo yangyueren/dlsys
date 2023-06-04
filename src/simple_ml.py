@@ -20,7 +20,7 @@ def add(x, y):
         Sum of x + y
     """
     ### BEGIN YOUR CODE
-    pass
+    return x + y
     ### END YOUR CODE
 
 
@@ -48,7 +48,41 @@ def parse_mnist(image_filename, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR CODE
-    pass
+    images = []
+    with gzip.open(image_filename, 'rb') as f:
+        file_content = f.read()
+        offset = 0
+        magic_num, num = struct.unpack_from('>ii', file_content, offset=offset)
+        offset += 8
+        assert magic_num == 2051, 'train image error'
+        rows, cols = struct.unpack_from('>ii', file_content, offset=offset)
+        offset += 8
+        for _ in range(num):
+            image = []
+            for i in range(rows):
+                for j in range(cols):
+                    pixel = struct.unpack_from('>B', file_content, offset=offset)[0]
+                    offset += 1
+                    image.append(pixel)
+            images.append(image)
+
+    labels = []
+    with gzip.open(label_filename, 'rb') as f:
+        file_content = f.read()
+        offset = 0
+        magic_num, num = struct.unpack_from('>ii', file_content, offset=offset)
+        offset += 8
+        assert magic_num == 2049, 'train label error'
+        for _ in range(num):
+            label = struct.unpack_from('>B', file_content, offset=offset)[0]
+            offset += 1
+            labels.append(label)
+    assert len(images) == len(labels), 'error'
+
+    images = np.array(images, dtype=np.float32)
+    images = (images - images.min()) / (images.max() - images.min())
+    labels = np.array(labels, dtype=np.uint8)
+    return images, labels
     ### END YOUR CODE
 
 
@@ -68,7 +102,8 @@ def softmax_loss(Z, y):
         Average softmax loss over the sample.
     """
     ### BEGIN YOUR CODE
-    pass
+    loss = (-Z[np.arange(0, len(y)), y] + np.log(np.sum(np.exp(Z), axis=1))).sum() / len(y)
+    return loss
     ### END YOUR CODE
 
 
@@ -91,7 +126,16 @@ def softmax_regression_epoch(X, y, theta, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    num_classes = theta.shape[1]
+    # import pdb;pdb.set_trace()
+    for i in range(int(np.ceil(len(y) / batch))):
+        batch_x = X[i*batch: (i+1)*batch]
+        batch_y = y[i*batch: (i+1)*batch]
+        # 𝑍=normalize(exp(𝑋Θ))
+        h = batch_x @ theta
+        Z = np.exp(h) / np.sum(np.exp(h), axis=1).reshape(-1, 1)
+        d_theta = (np.transpose(batch_x) @ (Z - np.eye(num_classes)[batch_y])) / len(batch_y)
+        theta -= lr * d_theta
     ### END YOUR CODE
 
 
