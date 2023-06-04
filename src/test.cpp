@@ -1,15 +1,17 @@
 #include <cmath>
 #include <cstring>
 #include <iostream>
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
 #include <vector>
+using namespace std;
 
-namespace py = pybind11;
+// check address bad access
+// g++ -fsanitize=address test.cpp -g -o test
+// ./test
 
 template <typename T>
 void matrix_dot(const std::vector<float> &x, const T &y,
                 std::vector<float> &ans, int m, int n, int k) {
+  // std::cerr << k << std::endl;
   for (int i = 0; i < m; i++) {
     for (int j = 0; j < k; j++) {
       ans[j + i * k] = 0;
@@ -18,6 +20,7 @@ void matrix_dot(const std::vector<float> &x, const T &y,
       }
     }
   }
+  // std::cerr << k << std::endl;
 }
 
 void transpose(std::vector<float> &x, int m, int n) {
@@ -67,26 +70,37 @@ void softmax_regression_epoch_cpp(const float *X, const unsigned char *y,
    * Returns:
    *     (None)
    */
-
+  // print((float*)X, m, n);
+  // print(theta, n, k);
+  std::vector<float> h(0.0, batch * k);
+  h.resize(batch * k);
+  std::vector<float> h_exp(0.0, batch * k);
+  h_exp.resize(batch * k);
+  std::vector<float> h_sum(0.0, batch);
+  h_sum.resize(batch);
+  std::vector<float> Z(0.0, batch * k);
+  Z.resize(batch * k);
+  std::vector<float> dtheta(0.0, n * k);
+  dtheta.resize(n * k);
+  std::vector<float> batch_X(0.0, batch * n);
+  batch_X.resize(batch * n);
+  std::cout << h.size() << " " << h_exp.size() << std::endl;
   /// BEGIN YOUR CODE
-  std::vector<float> h(batch * k, 0.0);
-  std::vector<float> h_exp(batch * k, 0.0);
-  std::vector<float> h_sum(batch, 0.0);
-  std::vector<float> Z(batch * k, 0.0);
-  std::vector<float> dtheta(n * k, 0.0);
-  std::vector<float> batch_X(batch * n, 0.0);
   for (int bi = 0; bi < (m + batch - 1) / batch; bi++) {
     int begin_x = bi * batch;
     int end_x = (bi + 1) * batch;
     if (end_x > m)
       end_x = m;
     int nums = end_x - begin_x;
+    // std::cerr << "beginx " << begin_x << " end x " << end_x << std::endl;
     for (int i = 0; i < nums * n; i++) {
       if (i + begin_x * n >= m * n) {
         std::cout << i + begin_x * n << std::endl;
       }
       batch_X[i] = X[i + begin_x * n];
     }
+    // print(batch_X, nums, n);
+    // std::cout << "----" << std::endl;
     matrix_dot(batch_X, // nums * n
                theta,   // n * k
                h,       // nums * k
@@ -105,11 +119,13 @@ void softmax_regression_epoch_cpp(const float *X, const unsigned char *y,
         Z[i * k + j] = h_exp[i * k + j] / h_sum[i]; // nums * k
       }
     }
+    // std::cout << "Z" << std::endl;
+    // print(Z, nums, k);
     for (int i = 0; i < nums; i++) {
       int y_label = y[i + begin_x];
       Z[i * k + y_label] -= 1.0;
     }
-    transpose(batch_X, nums, n);
+    // transpose(batch_X, nums, n);
     matrix_dot(batch_X, // n * nums
                Z,       // nums * k
                dtheta, n, nums, k);
@@ -117,28 +133,32 @@ void softmax_regression_epoch_cpp(const float *X, const unsigned char *y,
       dtheta[i] /= nums;
       theta[i] -= lr * dtheta[i];
     }
+    // std::cout << "dtheta" << std::endl;
+    // print(dtheta, n, k);
   }
 
   /// END YOUR CODE
 }
 
-/**
- * This is the pybind11 code that wraps the function above.  It's only role is
- * wrap the function above in a Python module, and you do not need to make any
- * edits to the code
- */
-PYBIND11_MODULE(simple_ml_ext, m) {
-  m.def(
-      "softmax_regression_epoch_cpp",
-      [](py::array_t<float, py::array::c_style> X,
-         py::array_t<unsigned char, py::array::c_style> y,
-         py::array_t<float, py::array::c_style> theta, float lr, int batch) {
-        softmax_regression_epoch_cpp(
-            static_cast<const float *>(X.request().ptr),
-            static_cast<const unsigned char *>(y.request().ptr),
-            static_cast<float *>(theta.request().ptr), X.request().shape[0],
-            X.request().shape[1], theta.request().shape[1], lr, batch);
-      },
-      py::arg("X"), py::arg("y"), py::arg("theta"), py::arg("lr"),
-      py::arg("batch"));
+int main() {
+  int m = 50, n = 10, k = 3;
+  std::vector<float> X(0, m * n);
+  X.resize(m * n);
+  for (int i = 0; i < m * n; i++)
+    X[i] = 1;
+  std::vector<unsigned char> y(0, m);
+  y.resize(m);
+  for (int i = 0; i < m; i++)
+    y[i] = 1;
+  std::vector<float> theta(0.0, n * k);
+  theta.resize(n * k);
+  for (int i = 0; i < n * k; i++)
+    theta[i] = 0;
+  // print(theta, n, k);
+  softmax_regression_epoch_cpp(X.data(), y.data(), theta.data(), m, n, k, 1.0,
+                               50);
+  print(theta, n, k);
+  // print(X, m, n);
+  // print(y, m, 1);
+  return 0;
 }

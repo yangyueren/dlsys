@@ -162,7 +162,20 @@ def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    
+    num_classes = W2.shape[1]
+    # import pdb;pdb.set_trace()
+    for i in range(int(np.ceil(len(y) / batch))):
+        batch_x = X[i*batch: (i+1)*batch]
+        batch_y = y[i*batch: (i+1)*batch]
+        Z1 = np.maximum(0, batch_x @ W1)
+        h = Z1 @ W2
+        G2 = np.exp(h) / np.sum(np.exp(h), axis=1).reshape(-1, 1) - np.eye(num_classes)[batch_y]
+        G1 = np.multiply((Z1 > 0), (G2 @ np.transpose(W2)))
+        dW1 = np.transpose(batch_x) @ G1 / len(batch_y)
+        dW2 = np.transpose(Z1) @ G2 / len(batch_y)
+        W1 -= lr * dW1
+        W2 -= lr * dW2
     ### END YOUR CODE
 
 
@@ -208,14 +221,36 @@ def train_nn(X_tr, y_tr, X_te, y_te, hidden_dim = 500,
 
 
 
-if __name__ == "__main__":
+def train_nn_fn():
     X_tr, y_tr = parse_mnist("data/train-images-idx3-ubyte.gz",
                              "data/train-labels-idx1-ubyte.gz")
     X_te, y_te = parse_mnist("data/t10k-images-idx3-ubyte.gz",
                              "data/t10k-labels-idx1-ubyte.gz")
 
-    print("Training softmax regression")
-    train_softmax(X_tr, y_tr, X_te, y_te, epochs=10, lr = 0.1)
+    # print("Training softmax regression")
+    # train_softmax(X_tr, y_tr, X_te, y_te, epochs=10, lr = 0.1)
 
     print("\nTraining two layer neural network w/ 100 hidden units")
-    train_nn(X_tr, y_tr, X_te, y_te, hidden_dim=100, epochs=20, lr = 0.2)
+    # train_nn(X_tr, y_tr, X_te, y_te, hidden_dim=100, epochs=20, lr = 0.2)
+    train_nn(X_tr, y_tr, X_te, y_te, hidden_dim=400, epochs=20, lr=0.2)
+
+def train_nn_fn_cpp():
+
+    import sys
+    sys.path.append("src/")
+    # Reload the simple_ml module to include the newly-compiled C++ extension
+    import importlib
+    import simple_ml
+    importlib.reload(simple_ml)
+    from simple_ml import train_softmax, parse_mnist
+
+    X_tr, y_tr = parse_mnist("data/train-images-idx3-ubyte.gz", 
+                            "data/train-labels-idx1-ubyte.gz")
+    X_te, y_te = parse_mnist("data/t10k-images-idx3-ubyte.gz",
+                            "data/t10k-labels-idx1-ubyte.gz")
+    train_softmax(X_tr, y_tr, X_te, y_te, epochs=10, lr = 0.2, batch=100, cpp=True)
+
+if __name__ == "__main__":
+    train_nn_fn()
+    train_nn_fn_cpp()
+
